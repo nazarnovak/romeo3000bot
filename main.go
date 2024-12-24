@@ -16,13 +16,6 @@ var (
 )
 
 func main() {
-	// Check if this run is scheduled
-	runScheduledTask := os.Getenv("RUN_SCHEDULED_TASK")
-	if runScheduledTask != "true" {
-		log.Println("Not a scheduled task. Exiting.")
-		os.Exit(0)
-	}
-
 	// Hack: workaround for fly.io, since they only allow hourly and daily schedules
 	currentHour := time.Now().UTC().Hour()
 
