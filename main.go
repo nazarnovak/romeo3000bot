@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	names     = []string{"Andrea", "Nazar"}
-	indexFile = "/data/index.txt"
+	hourToSend = 9
+	names      = []string{"Andrea", "Nazar"}
+	indexFile  = "/data/index.txt"
 )
 
 func main() {
@@ -20,8 +21,8 @@ func main() {
 	currentHour := time.Now().UTC().Hour()
 
 	// UTC is -1 in winter and -2 in summer (thanks, daylight savings)
-	if currentHour != 18 {
-		log.Println("Time is not 18. Exiting.")
+	if currentHour != hourToSend {
+		log.Printf("Time is not %d. Exiting.", hourToSend)
 		os.Exit(0)
 	}
 
