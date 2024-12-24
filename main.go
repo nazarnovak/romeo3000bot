@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -13,19 +11,30 @@ import (
 )
 
 var (
-	names = []string{"Andrea", "Nazar"}
-	index int
+	names     = []string{"Andrea", "Nazar"}
+	indexFile = "/data/index.txt"
 )
 
 func main() {
+	// Check if this run is scheduled
+	runScheduledTask := os.Getenv("RUN_SCHEDULED_TASK")
+	if runScheduledTask != "true" {
+		log.Println("Not a scheduled task. Exiting.")
+		os.Exit(0)
+	}
+
+	// Hack: workaround for fly.io, since they only allow hourly and daily schedules
+	currentHour := time.Now().UTC().Hour()
+
+	// UTC is -1 in winter and -2 in summer (thanks, daylight savings)
+	if currentHour != 18 {
+		log.Println("Time is not 18. Exiting.")
+		os.Exit(0)
+	}
+
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
 	if token == "" {
 		log.Fatal("TELEGRAM_BOT_TOKEN environment variable not set")
-	}
-
-	webhookURL := os.Getenv("TELEGRAM_WEBHOOK_URL")
-	if webhookURL == "" {
-		log.Fatal("TELEGRAM_WEBHOOK_URL environment variable not set")
 	}
 
 	chatIDStr := os.Getenv("TELEGRAM_CHAT_ID")
@@ -43,69 +52,47 @@ func main() {
 		log.Fatalf("Failed to initialize bot api: %v", err)
 	}
 
-	// Set up webhook URL
-	wh, err := tgbotapi.NewWebhook(webhookURL)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err = bot.Request(wh); err != nil {
-		log.Fatal(err)
-	}
-
-	http.HandleFunc("/webhook", webhookHandler)
-	go scheduleDailyMessages(bot, chatID)
-
-	log.Println("Starting server...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	sendMessage(bot, chatID)
 }
 
-func webhookHandler(w http.ResponseWriter, r *http.Request) {
-	var update tgbotapi.Update
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		log.Printf("Error decoding update: %v", err)
-		http.Error(w, "Can't process update", http.StatusBadRequest)
-		return
+// Load the last index from a file
+func loadIndex() int {
+	data, err := os.ReadFile(indexFile)
+	if err != nil {
+		// Default to 0 if file doesn't exist
+		return 0
 	}
-
-	if update.Message == nil {
-		return
+	index, err := strconv.Atoi(string(data))
+	if err != nil {
+		return 0
 	}
-
-	fmt.Println("Received message:", update.Message.Text)
-
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "OK")
+	return index
 }
 
-func scheduleDailyMessages(bot *tgbotapi.BotAPI, chatID int64) {
-	ticker := time.NewTicker(24 * time.Hour)
-	defer ticker.Stop()
-
-	// Load Swedish timezone (Stockholm)
-	loc, err := time.LoadLocation("Europe/Stockholm")
+// Save the current index to a file
+func saveIndex(index int) {
+	err := os.WriteFile(indexFile, []byte(strconv.Itoa(index)), 0644)
 	if err != nil {
-		log.Fatalf("Failed to load timezone: %v", err)
+		log.Fatalf("Failed to save index: %v", err)
+	}
+}
+
+func sendMessage(bot *tgbotapi.BotAPI, chatID int64) {
+	// Load the last index from a file or set default
+	index := loadIndex()
+	message := fmt.Sprintf("Time to send a song today, %s! 🙃", names[index])
+
+	// Prepare and send message
+	msg := tgbotapi.NewMessage(chatID, message)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("Failed to send message: %v", err)
 	}
 
-	// Calculate duration until 9:00 AM Swedish time
-	now := time.Now().In(loc)
-	next := time.Date(now.Year(), now.Month(), now.Day(), 17, 59, 0, 0, loc)
-	if now.After(next) {
-		next = next.Add(24 * time.Hour)
-	}
-	time.Sleep(time.Until(next))
+	// Update index and save for the next run
+	index = (index + 1) % len(names)
+	saveIndex(index)
 
-	for {
-		// Send message
-		message := fmt.Sprintf("Time to send a song today, %s! 🙃", names[index])
-		index = (index + 1) % len(names)
-
-		msg := tgbotapi.NewMessage(chatID, message)
-		if _, err := bot.Send(msg); err != nil {
-			log.Printf("Failed to send message: %v", err)
-		}
-
-		<-ticker.C
-	}
+	// Shut down the machine gracefully
+	log.Println("Message sent successfully. Exiting.")
+	os.Exit(0)
 }
