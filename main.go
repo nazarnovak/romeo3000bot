@@ -90,7 +90,7 @@ func scheduleDailyMessages(bot *tgbotapi.BotAPI, chatID int64) {
 
 	// Calculate duration until 9:00 AM Swedish time
 	now := time.Now().In(loc)
-	next := time.Date(now.Year(), now.Month(), now.Day(), 17, 43, 0, 0, loc)
+	next := time.Date(now.Year(), now.Month(), now.Day(), 17, 49, 0, 0, loc)
 	if now.After(next) {
 		next = next.Add(24 * time.Hour)
 	}
