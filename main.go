@@ -57,7 +57,7 @@ func main() {
 	go scheduleDailyMessages(bot, chatID)
 
 	log.Println("Starting server...")
-	log.Fatal(http.ListenAndServe(":80", nil))
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
