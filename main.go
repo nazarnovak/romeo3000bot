@@ -82,9 +82,15 @@ func scheduleDailyMessages(bot *tgbotapi.BotAPI, chatID int64) {
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
 
-	// Calculate duration until 9:00 AM
-	now := time.Now()
-	next := time.Date(now.Year(), now.Month(), now.Day(), 17, 36, 0, 0, now.Location())
+	// Load Swedish timezone (Stockholm)
+	loc, err := time.LoadLocation("Europe/Stockholm")
+	if err != nil {
+		log.Fatalf("Failed to load timezone: %v", err)
+	}
+
+	// Calculate duration until 9:00 AM Swedish time
+	now := time.Now().In(loc)
+	next := time.Date(now.Year(), now.Month(), now.Day(), 17, 43, 0, 0, loc)
 	if now.After(next) {
 		next = next.Add(24 * time.Hour)
 	}
